@@ -1,0 +1,165 @@
+# Reference definition of the FitControl infrastructure.
+# It documents the target topology: services, networks, volumes, ports and the
+# configuration contract between services. Application code is developed in
+# separate folders and is not required for this file to describe the system.
+#
+# Ports marked "dev only" are published for local debugging and are closed in
+# the target setup, where the gateway is the only entry point.
+
+name: fitcontrol
+
+services:
+  # --- API gateway (YARP) ---
+  gateway:
+    build: ./gateway
+    restart: unless-stopped
+    environment:
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+      Jwt__JwksUrl: ${JWKS_URL}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on: [auth-service, meal-planning-api, analytics-service]
+    networks: [fitcontrol-net]
+
+  # --- Auth service (ASP.NET) ---
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: AuthService/Dockerfile
+    restart: unless-stopped
+    environment:
+      ConnectionStrings__DefaultConnection: Host=auth-db;Port=5432;Database=${AUTH_DB_NAME:-auth_db};Username=${AUTH_DB_USER:-auth_user};Password=${AUTH_DB_PASSWORD}
+      RsaKeys__KeysPath: /run/keys
+    volumes:
+      - ./services/auth-service/AuthService/Keys:/run/keys:ro
+    ports:
+      - "${AUTH_PORT:-5001}:8080" # dev only
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    networks: [fitcontrol-net, auth-db-net]
+
+  auth-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${AUTH_DB_NAME:-auth_db}
+      POSTGRES_USER: ${AUTH_DB_USER:-auth_user}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:?set AUTH_DB_PASSWORD in .env}
+    ports:
+      - "${AUTH_DB_PORT:-5433}:5432" # dev only: pgAdmin and dotnet ef from the host
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [auth-db-net]
+
+  # --- Meal planning service (ASP.NET) ---
+  meal-planning-api:
+    build: ./services/meal-planning
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__MealPlanning: Host=meal-planning-db;Port=5432;Database=${MEALPLANNING_DB_NAME:-meal_planning};Username=${MEALPLANNING_DB_USER:-meal_planning};Password=${MEALPLANNING_DB_PASSWORD}
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__User: ${RABBITMQ_USER:-fitcontrol}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+      Jwt__JwksUrl: ${JWKS_URL} # variable name to be confirmed with the service owner
+    ports:
+      - "${MEALPLANNING_API_PORT:-5002}:8080" # dev only
+    depends_on:
+      meal-planning-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [fitcontrol-net, meal-planning-db-net]
+
+  meal-planning-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${MEALPLANNING_DB_NAME:-meal_planning}
+      POSTGRES_USER: ${MEALPLANNING_DB_USER:-meal_planning}
+      POSTGRES_PASSWORD: ${MEALPLANNING_DB_PASSWORD:?set MEALPLANNING_DB_PASSWORD in .env}
+    volumes:
+      - meal-planning-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [meal-planning-db-net]
+
+  # --- Analytics service (Python) ---
+  analytics-service:
+    build: ./services/analytics-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${ANALYTICS_DB_USER:-analytics_user}:${ANALYTICS_DB_PASSWORD}@analytics-db:5432/${ANALYTICS_DB_NAME:-analytics_db}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-fitcontrol}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      JWKS_URL: ${JWKS_URL} # variable name to be confirmed with the service owner
+    ports:
+      - "${ANALYTICS_PORT:-8000}:8000" # dev only
+    depends_on:
+      analytics-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [fitcontrol-net, analytics-db-net]
+
+  analytics-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${ANALYTICS_DB_NAME:-analytics_db}
+      POSTGRES_USER: ${ANALYTICS_DB_USER:-analytics_user}
+      POSTGRES_PASSWORD: ${ANALYTICS_DB_PASSWORD:?set ANALYTICS_DB_PASSWORD in .env}
+    volumes:
+      - analytics-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [analytics-db-net]
+
+  # --- Message broker ---
+  rabbitmq:
+    image: rabbitmq:4.3-management
+    hostname: rabbitmq # broker data is tied to the hostname
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-fitcontrol}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
+    ports:
+      - "15672:15672" # dev only: management UI
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [fitcontrol-net]
+
+volumes:
+  auth-db-data:
+  meal-planning-db-data:
+  analytics-db-data:
+  rabbitmq-data:
+
+networks:
+  fitcontrol-net:
+  auth-db-net:
+  meal-planning-db-net:
+  analytics-db-net:
