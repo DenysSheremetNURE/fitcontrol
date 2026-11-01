@@ -1,4 +1,7 @@
 from fastapi import FastAPI
+from sqlalchemy import text
+
+from app.db import engine
 
 app = FastAPI(
     title="FitControl — Analytics & Reporting Service",
@@ -9,4 +12,7 @@ app = FastAPI(
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    # Робимо найпростіший запит до бази. Якщо база недоступна — буде помилка 500
+    async with engine.connect() as conn:
+        await conn.execute(text("SELECT 1"))
+    return {"status": "ok", "database": "ok"}
