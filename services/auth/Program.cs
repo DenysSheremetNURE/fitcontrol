@@ -102,19 +102,22 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
         ForwardedHeaders.XForwardedFor |
         ForwardedHeaders.XForwardedProto |
         ForwardedHeaders.XForwardedHost;
+    options.KnownProxies.Clear();
+    options.KnownIPNetworks.Clear();
 });
+
 
 var app = builder.Build();
 app.UseForwardedHeaders();
 
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    using var scope = app.Services.CreateScope();
+    scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
+}
+
 if (app.Environment.IsDevelopment())
 {
-    using (var scope = app.Services.CreateScope())
-    {
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        dbContext.Database.Migrate();
-    }
-
     app.UseSwagger();
     app.UseSwaggerUI();
 }

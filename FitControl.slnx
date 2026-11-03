@@ -1,6 +1,4 @@
 <Solution>
-  <Folder Name="/services/">
-    <Project Path="services/auth/AuthService.csproj" />
-  </Folder>
-  <Project Path="gateway/Gateway/Gateway.csproj" />
+  <Project Path="gateway/Gateway.csproj" />
+  <Project Path="services/auth/AuthService.csproj" />
 </Solution>

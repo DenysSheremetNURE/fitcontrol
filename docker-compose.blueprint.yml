@@ -11,28 +11,34 @@ name: fitcontrol
 services:
   # --- API gateway (YARP) ---
   gateway:
-    build: ./gateway
+    build:
+      context: ./gateway
     restart: unless-stopped
     environment:
+      Jwt__MetadataAddress: ${AUTH_METADATA_URL}
+      Jwt__RequireHttpsMetadata: "false"
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
-      Jwt__JwksUrl: ${JWKS_URL}
+      ReverseProxy__Clusters__auth__Destinations__d1__Address: http://auth-service:8080/
+      ReverseProxy__Clusters__meals__Destinations__d1__Address: http://meal-planning-api:8080/
     ports:
       - "${GATEWAY_PORT:-8080}:8080"
-    depends_on: [auth-service, meal-planning-api, analytics-service]
+    depends_on: [auth-service]
     networks: [fitcontrol-net]
 
   # --- Auth service (ASP.NET) ---
   auth-service:
     build:
-      context: ./services/auth-service
-      dockerfile: AuthService/Dockerfile
+      context: ./services/auth
     restart: unless-stopped
     environment:
       ConnectionStrings__DefaultConnection: Host=auth-db;Port=5432;Database=${AUTH_DB_NAME:-auth_db};Username=${AUTH_DB_USER:-auth_user};Password=${AUTH_DB_PASSWORD}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
       RsaKeys__KeysPath: /run/keys
+      Database__MigrateOnStartup: "true"
     volumes:
-      - ./services/auth-service/AuthService/Keys:/run/keys:ro
+      - ./services/auth/Keys:/run/keys:ro
     ports:
       - "${AUTH_PORT:-5001}:8080" # dev only
     depends_on:
