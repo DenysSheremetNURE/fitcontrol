@@ -75,9 +75,11 @@ services:
       RabbitMq__Port: 5672
       RabbitMq__User: ${RABBITMQ_USER:-fitcontrol}
       RabbitMq__Password: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
+      Jwt__MetadataAddress: ${AUTH_METADATA_URL}
+      Jwt__RequireHttpsMetadata: "false"
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
-      Jwt__JwksUrl: ${JWKS_URL} # variable name to be confirmed with the service owner
+      Database__MigrateOnStartup: "true"
     ports:
       - "${MEALPLANNING_API_PORT:-5002}:8080" # dev only
     depends_on:

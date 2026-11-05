@@ -1,0 +1,18 @@
+# Local database for running the service from the host (dotnet run, dotnet ef).
+# Connection string goes to user-secrets:
+#   dotnet user-secrets set "ConnectionStrings:MealPlanning" "Host=localhost;Port=5434;Database=meal_planning;Username=meal_planning;Password=<your password>"
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fitcontrol-meal-planning-db
+    environment:
+      POSTGRES_DB: meal_planning
+      POSTGRES_USER: meal_planning
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
