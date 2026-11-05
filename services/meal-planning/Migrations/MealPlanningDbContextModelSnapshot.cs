@@ -58,6 +58,111 @@ namespace MealPlanningService.Migrations
                     b.ToTable("Foods");
                 });
 
+            modelBuilder.Entity("MealPlanningService.Entities.Meal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MealPlanId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MealType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MealPlanId", "MealType")
+                        .IsUnique();
+
+                    b.ToTable("Meals", (string)null);
+                });
+
+            modelBuilder.Entity("MealPlanningService.Entities.MealItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<decimal>("CarbsPerUnit")
+                        .HasPrecision(16, 6)
+                        .HasColumnType("numeric(16,6)");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("FatPerUnit")
+                        .HasPrecision(16, 6)
+                        .HasColumnType("numeric(16,6)");
+
+                    b.Property<int?>("FoodId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("KcalPerUnit")
+                        .HasPrecision(16, 6)
+                        .HasColumnType("numeric(16,6)");
+
+                    b.Property<Guid>("MealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal>("ProteinPerUnit")
+                        .HasPrecision(16, 6)
+                        .HasColumnType("numeric(16,6)");
+
+                    b.Property<Guid?>("RecipeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MealId");
+
+                    b.ToTable("MealItems", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_MealItems_ExactlyOneSource", "(\"RecipeId\" IS NULL) <> (\"FoodId\" IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("MealPlanningService.Entities.MealPlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("PlanDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId", "PlanDate")
+                        .IsUnique();
+
+                    b.ToTable("MealPlans");
+                });
+
             modelBuilder.Entity("MealPlanningService.Entities.Recipe", b =>
                 {
                     b.Property<Guid>("Id")
@@ -121,6 +226,28 @@ namespace MealPlanningService.Migrations
                     b.ToTable("RecipeIngredients", (string)null);
                 });
 
+            modelBuilder.Entity("MealPlanningService.Entities.Meal", b =>
+                {
+                    b.HasOne("MealPlanningService.Entities.MealPlan", "MealPlan")
+                        .WithMany("Meals")
+                        .HasForeignKey("MealPlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MealPlan");
+                });
+
+            modelBuilder.Entity("MealPlanningService.Entities.MealItem", b =>
+                {
+                    b.HasOne("MealPlanningService.Entities.Meal", "Meal")
+                        .WithMany("Items")
+                        .HasForeignKey("MealId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Meal");
+                });
+
             modelBuilder.Entity("MealPlanningService.Entities.RecipeIngredient", b =>
                 {
                     b.HasOne("MealPlanningService.Entities.Food", "Food")
@@ -138,6 +265,16 @@ namespace MealPlanningService.Migrations
                     b.Navigation("Food");
 
                     b.Navigation("Recipe");
+                });
+
+            modelBuilder.Entity("MealPlanningService.Entities.Meal", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("MealPlanningService.Entities.MealPlan", b =>
+                {
+                    b.Navigation("Meals");
                 });
 
             modelBuilder.Entity("MealPlanningService.Entities.Recipe", b =>

@@ -11,6 +11,7 @@ public class MealPlanningDbContext : DbContext
 
     public DbSet<Food> Foods => Set<Food>();
     public DbSet<Recipe> Recipes => Set<Recipe>();
+    public DbSet<MealPlan> MealPlans => Set<MealPlan>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -61,6 +62,51 @@ public class MealPlanningDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(i => i.FoodId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<MealPlan>(entity =>
+        {
+            entity.Property(p => p.Version).IsConcurrencyToken();
+
+            entity.HasIndex(p => new { p.OwnerUserId, p.PlanDate }).IsUnique();
+
+            entity.HasMany(p => p.Meals)
+                .WithOne(m => m.MealPlan)
+                .HasForeignKey(m => m.MealPlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Meal>(entity =>
+        {
+            entity.ToTable("Meals");
+
+            entity.Property(m => m.MealType)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            entity.HasIndex(m => new { m.MealPlanId, m.MealType }).IsUnique();
+
+            entity.HasMany(m => m.Items)
+                .WithOne(i => i.Meal)
+                .HasForeignKey(i => i.MealId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MealItem>(entity =>
+        {
+            entity.ToTable("MealItems", table => table.HasCheckConstraint(
+                "CK_MealItems_ExactlyOneSource",
+                "(\"RecipeId\" IS NULL) <> (\"FoodId\" IS NULL)"));
+
+            entity.Property(i => i.Name)
+                .IsRequired()
+                .HasMaxLength(200);
+
+            entity.Property(i => i.Amount).HasPrecision(8, 2);
+            entity.Property(i => i.KcalPerUnit).HasPrecision(16, 6);
+            entity.Property(i => i.ProteinPerUnit).HasPrecision(16, 6);
+            entity.Property(i => i.FatPerUnit).HasPrecision(16, 6);
+            entity.Property(i => i.CarbsPerUnit).HasPrecision(16, 6);
         });
     }
 }

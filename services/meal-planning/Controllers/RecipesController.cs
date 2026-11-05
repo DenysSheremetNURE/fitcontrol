@@ -68,7 +68,7 @@ public sealed class RecipesController : ControllerBase
                 r.Description,
                 r.Servings,
                 r.OwnerUserId == userId,
-                (TotalNutrition(r) / r.Servings).Rounded()))
+                (NutritionFacts.ForRecipe(r) / r.Servings).Rounded()))
             .ToList();
 
         return Ok(new PagedResponse<RecipeSummaryResponse>(items, total, limit, offset));
@@ -200,12 +200,9 @@ public sealed class RecipesController : ControllerBase
         }));
     }
 
-    private static NutritionFacts TotalNutrition(Recipe recipe) =>
-        NutritionFacts.Sum(recipe.Ingredients.Select(i => NutritionFacts.ForFood(i.Food, i.AmountG)));
-
     private RecipeResponse ToResponse(Recipe recipe)
     {
-        var total = TotalNutrition(recipe);
+        var total = NutritionFacts.ForRecipe(recipe);
 
         return new RecipeResponse(
             recipe.Id,
