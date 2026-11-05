@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using MealPlanningService.Data;
 using MealPlanningService.DTOs;
 using MealPlanningService.Entities;
+using MealPlanningService.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,8 +12,6 @@ namespace MealPlanningService.Controllers;
 [Route("api/meals/foods")]
 public sealed class FoodsController : ControllerBase
 {
-    private const string LikeEscape = "\\";
-
     private readonly MealPlanningDbContext _dbContext;
 
     public FoodsController(MealPlanningDbContext dbContext)
@@ -28,16 +27,13 @@ public sealed class FoodsController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         // Names look like "Chicken, broilers or fryers, breast", so every word is matched on its own.
-        var words = (search ?? string.Empty)
-            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
-            .Select(EscapeLike)
-            .ToList();
+        var words = LikeSearch.Words(search);
 
         var query = _dbContext.Foods.AsNoTracking();
         foreach (var word in words)
         {
             var pattern = $"%{word}%";
-            query = query.Where(f => EF.Functions.ILike(f.Name, pattern, LikeEscape));
+            query = query.Where(f => EF.Functions.ILike(f.Name, pattern, LikeSearch.Escape));
         }
 
         var total = await query.CountAsync(cancellationToken);
@@ -45,7 +41,7 @@ public sealed class FoodsController : ControllerBase
         // Names starting with the first word come first, and shorter names are usually the plainer foods.
         var prefix = words.Count > 0 ? $"{words[0]}%" : "%";
         var items = await query
-            .OrderByDescending(f => EF.Functions.ILike(f.Name, prefix, LikeEscape))
+            .OrderByDescending(f => EF.Functions.ILike(f.Name, prefix, LikeSearch.Escape))
             .ThenBy(f => f.Name.Length)
             .ThenBy(f => f.Name)
             .Skip(offset)
@@ -64,11 +60,6 @@ public sealed class FoodsController : ControllerBase
 
         return food is null ? NotFound() : Ok(ToResponse(food));
     }
-
-    private static string EscapeLike(string value) => value
-        .Replace(LikeEscape, LikeEscape + LikeEscape)
-        .Replace("%", LikeEscape + "%")
-        .Replace("_", LikeEscape + "_");
 
     private static FoodResponse ToResponse(Food f) => new(
         f.Id, f.Name, f.Category, f.KcalPer100G, f.ProteinPer100G, f.FatPer100G, f.CarbsPer100G);
