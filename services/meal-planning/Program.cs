@@ -67,7 +67,9 @@ var app = builder.Build();
 if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
     using var scope = app.Services.CreateScope();
-    scope.ServiceProvider.GetRequiredService<MealPlanningDbContext>().Database.Migrate();
+    var dbContext = scope.ServiceProvider.GetRequiredService<MealPlanningDbContext>();
+    dbContext.Database.Migrate();
+    await FoodSeeder.SeedAsync(dbContext, app.Logger);
 }
 
 if (app.Environment.IsDevelopment())
