@@ -31,6 +31,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddSingleton<IRsaKeyManager, RsaKeyManager>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
+builder.Services.AddHostedService<RefreshTokenCleanupService>();
 
 builder.Services.AddRateLimiter(options =>
 {
