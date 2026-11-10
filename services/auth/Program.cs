@@ -41,7 +41,7 @@ builder.Services.AddRateLimiter(options =>
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 10,
+                PermitLimit = builder.Configuration.GetValue("RateLimiting:AuthPermitLimit", 10),
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));

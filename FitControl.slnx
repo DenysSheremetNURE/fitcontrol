@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="gateway/Gateway.csproj" />
+  <Project Path="services/auth.tests/AuthService.Tests/AuthService.Tests.csproj" Id="ca5b1b63-a303-42e5-91bf-7d7f304ff55a" />
   <Project Path="services/auth/AuthService.csproj" />
 </Solution>
