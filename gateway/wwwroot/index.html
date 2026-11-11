@@ -1,0 +1,424 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Auth Playground</title>
+    <style>
+        :root {
+            --bg: #f6f7f9;
+            --card: #ffffff;
+            --text: #1c2128;
+            --muted: #667085;
+            --border: #dfe3e8;
+            --accent: #2563eb;
+            --ok: #15803d;
+            --bad: #b91c1c;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f1318;
+                --card: #171c23;
+                --text: #e6e9ee;
+                --muted: #8b95a5;
+                --border: #2a313b;
+                --accent: #5b9dff;
+                --ok: #4ade80;
+                --bad: #f87171;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font: 15px/1.5 system-ui, sans-serif;
+        }
+
+        main {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 24px 16px 48px;
+        }
+
+        h1 {
+            font-size: 22px;
+            margin: 0 0 4px;
+        }
+
+        h2 {
+            font-size: 15px;
+            margin: 0 0 4px;
+        }
+
+        .muted {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+            align-items: center;
+        }
+
+        input[type=text], input[type=email], input[type=password] {
+            flex: 1 1 200px;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            color: inherit;
+            font: inherit;
+        }
+
+        button {
+            padding: 8px 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            color: inherit;
+            font: inherit;
+            cursor: pointer;
+        }
+
+            button:hover:not(:disabled) {
+                border-color: var(--accent);
+            }
+
+            button:disabled {
+                opacity: .45;
+                cursor: default;
+            }
+
+            button.primary {
+                background: var(--accent);
+                border-color: var(--accent);
+                color: #fff;
+            }
+
+        dl {
+            display: grid;
+            grid-template-columns: 110px 1fr;
+            gap: 6px 12px;
+            margin: 12px 0 0;
+        }
+
+        dt {
+            color: var(--muted);
+        }
+
+        dd {
+            margin: 0;
+            word-break: break-all;
+        }
+
+        pre, code {
+            font: 12.5px/1.45 ui-monospace, Consolas, monospace;
+        }
+
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        #log {
+            max-height: 420px;
+            overflow: auto;
+            margin-top: 10px;
+        }
+
+        .entry {
+            border-top: 1px solid var(--border);
+            padding: 8px 0;
+        }
+
+            .entry:first-child {
+                border-top: 0;
+            }
+
+        .ok {
+            color: var(--ok);
+        }
+
+        .bad {
+            color: var(--bad);
+        }
+
+        label {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Auth playground</h1>
+        <p class="muted">
+            Dev tool served by the gateway. The access token lives only in this page's memory;
+            the refresh token is an HttpOnly cookie that JavaScript cannot read
+            (see DevTools &rarr; Application &rarr; Cookies).
+        </p>
+
+        <section class="card">
+            <h2>Credentials</h2>
+            <div class="row">
+                <input id="email" type="email" value="demo@test.cz" placeholder="email" autocomplete="off">
+                <input id="password" type="password" value="Passw0rd!123" placeholder="password" autocomplete="off">
+            </div>
+            <div class="row">
+                <button id="btn-register">Register</button>
+                <button id="btn-login" class="primary">Login</button>
+                <button id="btn-refresh">Refresh</button>
+                <button id="btn-logout">Logout</button>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Session</h2>
+            <dl>
+                <dt>State</dt>
+                <dd id="s-state" class="bad">signed out</dd>
+                <dt>Access token</dt>
+                <dd><code id="s-token">—</code></dd>
+                <dt>Expires</dt>
+                <dd id="s-expires">—</dd>
+                <dt>Claims</dt>
+                <dd><pre id="s-claims">—</pre></dd>
+            </dl>
+            <div class="row">
+                <button id="btn-copy" disabled>Copy access token</button>
+                <label><input type="checkbox" id="auto-refresh" checked> on 401: refresh once and retry (single flight)</label>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Requests</h2>
+            <p class="muted">GET with the access token. Try <code>/api/auth/me</code> (200 with a token, 401 without) and <code>/api/meals/ping</code> (401 without a token, 502 with one while no meals service exists).</p>
+            <div class="row">
+                <input id="path" type="text" value="/api/auth/me">
+                <button id="btn-call">GET</button>
+            </div>
+            <div class="row">
+                <button id="btn-parallel">3 parallel refreshes (grace period)</button>
+                <button id="btn-limit">12 wrong logins (rate limit, blocks login for ~1 min)</button>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="row" style="margin-top:0; justify-content: space-between;">
+                <h2>Log</h2>
+                <button id="btn-clear">Clear</button>
+            </div>
+            <div id="log"></div>
+        </section>
+    </main>
+
+    <script>(() => {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+
+  let accessToken = null;
+  let expiresAt = null;
+  let refreshing = null;
+
+  // ---------- logging ----------
+
+  function log(label, method, url, status, data) {
+    const entry = document.createElement('div');
+    entry.className = 'entry';
+
+    const head = document.createElement('div');
+    head.className = status >= 200 && status < 300 ? 'ok' : 'bad';
+    head.textContent = `${new Date().toLocaleTimeString()}  ${method} ${url}  ->  ${status || 'network error'}` +
+      (label ? `  (${label})` : '');
+
+    const body = document.createElement('pre');
+    body.textContent = data == null ? '' : (typeof data === 'string' ? data : JSON.stringify(data, null, 2));
+
+    entry.append(head, body);
+    $('log').prepend(entry);
+  }
+
+  function note(text) {
+    const entry = document.createElement('div');
+    entry.className = 'entry muted';
+    entry.textContent = `${new Date().toLocaleTimeString()}  ${text}`;
+    $('log').prepend(entry);
+  }
+
+  // ---------- http ----------
+
+  async function raw(method, url, { body, auth = true, label = '' } = {}) {
+    const headers = {};
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    if (auth && accessToken) headers['Authorization'] = 'Bearer ' + accessToken;
+
+    let status = 0, ok = false, data = null;
+    try {
+      const res = await fetch(url, {
+        method,
+        headers,
+        credentials: 'same-origin',
+        body: body === undefined ? undefined : JSON.stringify(body)
+      });
+      status = res.status;
+      ok = res.ok;
+      const text = await res.text();
+      try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    } catch (err) {
+      data = String(err);
+    }
+
+    log(label, method, url, status, data);
+    return { status, ok, data };
+  }
+
+  async function doRefresh(label = '') {
+    const r = await raw('POST', '/api/auth/refresh', { auth: false, label });
+    if (r.ok) setSession(r.data); else clearSession();
+    return r;
+  }
+
+  // One refresh at a time, even if several requests get a 401 together.
+  function refreshOnce(label = '') {
+    refreshing ??= doRefresh(label).finally(() => { refreshing = null; });
+    return refreshing;
+  }
+
+  // ---------- session ----------
+
+  function setSession(data) {
+    accessToken = data.accessToken;
+    expiresAt = new Date(data.expiresAt);
+    render();
+  }
+
+  function clearSession() {
+    accessToken = null;
+    expiresAt = null;
+    render();
+  }
+
+  function decode(token) {
+    try {
+      const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const bytes = atob(part).split('').map((c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+      return JSON.parse(decodeURIComponent(bytes));
+    } catch {
+      return null;
+    }
+  }
+
+  function render() {
+    const signedIn = !!accessToken;
+    const state = $('s-state');
+    state.textContent = signedIn ? 'signed in' : 'signed out';
+    state.className = signedIn ? 'ok' : 'bad';
+
+    $('s-token').textContent = signedIn ? accessToken.slice(0, 48) + '...' : '—';
+
+    const claims = signedIn ? decode(accessToken) : null;
+    $('s-claims').textContent = claims ? JSON.stringify(claims, null, 2) : '—';
+
+    $('btn-copy').disabled = !signedIn;
+    tick();
+  }
+
+  function tick() {
+    const el = $('s-expires');
+    if (!accessToken || !expiresAt) { el.textContent = '—'; return; }
+    const seconds = Math.round((expiresAt - Date.now()) / 1000);
+    el.textContent = seconds > 0 ? `in ${seconds} s` : 'expired';
+  }
+
+  setInterval(tick, 1000);
+
+  // ---------- actions ----------
+
+  async function authenticate(path) {
+    const r = await raw('POST', path, {
+      auth: false,
+      body: { email: $('email').value.trim(), password: $('password').value }
+    });
+    if (r.ok) setSession(r.data);
+  }
+
+  $('btn-register').onclick = () => authenticate('/api/auth/register');
+  $('btn-login').onclick = () => authenticate('/api/auth/login');
+  $('btn-refresh').onclick = () => refreshOnce('manual');
+
+  $('btn-logout').onclick = async () => {
+    await raw('POST', '/api/auth/logout', { auth: false });
+    clearSession();
+  };
+
+  $('btn-copy').onclick = async () => {
+    await navigator.clipboard.writeText(accessToken);
+    note('access token copied to the clipboard');
+  };
+
+  $('btn-call').onclick = async () => {
+    const path = $('path').value.trim();
+    let r = await raw('GET', path);
+
+    if (r.status === 401 && $('auto-refresh').checked) {
+      note('got 401, refreshing once and retrying');
+      if ((await refreshOnce('auto')).ok) {
+        r = await raw('GET', path, { label: 'retry' });
+      }
+    }
+  };
+
+  $('btn-parallel').onclick = async () => {
+    note('sending 3 refresh requests with the same cookie at once');
+    const results = await Promise.all([1, 2, 3].map((i) =>
+      raw('POST', '/api/auth/refresh', { auth: false, label: `parallel #${i}` })));
+
+    const first = results.find((r) => r.ok);
+    if (first) setSession(first.data);
+    note(`statuses: ${results.map((r) => r.status).join(', ')} (all 200 means the grace period absorbed the race)`);
+  };
+
+  $('btn-limit').onclick = async () => {
+    note('sending 12 wrong logins at once');
+    const results = await Promise.all(Array.from({ length: 12 }, (_, i) =>
+      raw('POST', '/api/auth/login', {
+        auth: false,
+        label: `wrong login #${i + 1}`,
+        body: { email: 'nobody@test.cz', password: 'wrongpass1' }
+      })));
+
+    const counts = {};
+    results.forEach((r) => { counts[r.status] = (counts[r.status] || 0) + 1; });
+    note(`status counts: ${JSON.stringify(counts)} (429 means the rate limiter kicked in)`);
+  };
+
+  $('btn-clear').onclick = () => { $('log').replaceChildren(); };
+
+  // Like a real SPA: on load there is no token in memory, so try a silent refresh.
+  // The first visit logs a 401, because there is no cookie yet.
+  render();
+  refreshOnce('silent refresh on page load');
+})();</script>
+</body>
+</html>

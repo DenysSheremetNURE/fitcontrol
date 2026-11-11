@@ -31,6 +31,9 @@ builder.Services.AddAuthorizationBuilder()
 
 var app = builder.Build();
 
+app.UseDefaultFiles();//
+app.UseStaticFiles();//
+
 app.MapHealthChecks("/health");
 
 app.UseAuthentication();

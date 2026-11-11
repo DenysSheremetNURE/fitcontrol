@@ -31,6 +31,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddSingleton<IRsaKeyManager, RsaKeyManager>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
+builder.Services.AddHostedService<RefreshTokenCleanupService>();
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -40,7 +41,7 @@ builder.Services.AddRateLimiter(options =>
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 10,
+                PermitLimit = builder.Configuration.GetValue("RateLimiting:AuthPermitLimit", 10),
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
