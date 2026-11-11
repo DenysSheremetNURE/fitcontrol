@@ -2,4 +2,5 @@
   <Project Path="gateway/Gateway.csproj" />
   <Project Path="services/auth/AuthService.csproj" />
   <Project Path="services/meal-planning/MealPlanningService.csproj" />
+  <Project Path="tests/MealPlanningService.Tests/MealPlanningService.Tests.csproj" />
 </Solution>

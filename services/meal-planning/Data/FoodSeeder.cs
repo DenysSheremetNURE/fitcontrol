@@ -24,7 +24,7 @@ public static class FoodSeeder
         logger.LogInformation("Seeded {Count} foods.", foods.Count);
     }
 
-    private static List<Food> ReadFoods()
+    internal static List<Food> ReadFoods()
     {
         using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(ResourceName)
             ?? throw new InvalidOperationException($"Embedded resource '{ResourceName}' was not found.");

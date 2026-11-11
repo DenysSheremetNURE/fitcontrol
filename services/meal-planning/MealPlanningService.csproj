@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Data\Seed\foods.tsv" LogicalName="foods.tsv" />
+    <InternalsVisibleTo Include="MealPlanningService.Tests" />
   </ItemGroup>
 
   <ItemGroup>
